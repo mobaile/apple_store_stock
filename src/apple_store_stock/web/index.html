@@ -131,7 +131,7 @@
   </main>
   <script>
     const LAST_QUERY_KEY = "apple-store-stock:last-query";
-    const state = { region: "hk", macauLoaded: false, lastQuery: null };
+    const state = { region: "hk", lastQuery: null };
     const elements = {
       tabHk: document.querySelector("#tab-hk"),
       tabMo: document.querySelector("#tab-mo"),
@@ -256,7 +256,6 @@
         if (!response.ok) throw new Error(data.message || `查询失败（HTTP ${response.status}）`);
         renderStores(data);
         if (region === "hk") rememberLastQuery(data);
-        if (region === "mo") state.macauLoaded = true;
       } catch (error) {
         showError(error instanceof Error ? error.message : "查询失败，请稍后重试。");
       } finally {
@@ -274,7 +273,7 @@
       if (isHk && state.lastQuery) renderStores(state.lastQuery);
       else elements.results.classList.add("hidden");
       showError("");
-      if (!isHk && !state.macauLoaded) requestStock("mo");
+      if (!isHk) requestStock("mo");
     }
 
     restoreLastQuery();

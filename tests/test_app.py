@@ -294,6 +294,12 @@ class HomePageTests(unittest.TestCase):
         self.assertIn("localStorage.setItem(LAST_QUERY_KEY", page)
         self.assertIn("restoreLastQuery();", page)
 
+    def test_macau_tab_always_refreshes_store_information(self) -> None:
+        page = files("apple_store_stock").joinpath("web/index.html").read_text()
+
+        self.assertIn('if (!isHk) requestStock("mo");', page)
+        self.assertNotIn("macauLoaded", page)
+
 
 class MacauTests(unittest.TestCase):
     def test_macau_response_has_official_stores(self) -> None:
