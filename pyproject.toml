@@ -3,6 +3,7 @@ name = "apple-store-stock"
 version = "0.1.0"
 description = "查询香港 Apple Store 精确 SKU 的实时库存"
 readme = "README.md"
+license = "0BSD"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "playwright>=1.61,<2",
