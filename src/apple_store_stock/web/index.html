@@ -130,7 +130,8 @@
     </section>
   </main>
   <script>
-    const state = { region: "hk", macauLoaded: false };
+    const LAST_QUERY_KEY = "apple-store-stock:last-query";
+    const state = { region: "hk", macauLoaded: false, lastQuery: null };
     const elements = {
       tabHk: document.querySelector("#tab-hk"),
       tabMo: document.querySelector("#tab-mo"),
@@ -221,6 +222,27 @@
       elements.results.classList.remove("hidden");
     }
 
+    function rememberLastQuery(data) {
+      state.lastQuery = data;
+      try {
+        localStorage.setItem(LAST_QUERY_KEY, JSON.stringify(data));
+      } catch {
+        // 浏览器禁用本地存储时，当前页面仍保留结果。
+      }
+    }
+
+    function restoreLastQuery() {
+      try {
+        const data = JSON.parse(localStorage.getItem(LAST_QUERY_KEY) || "null");
+        if (data?.region === "hk" && data.checked_at && Array.isArray(data.stores)) {
+          state.lastQuery = data;
+          renderStores(data);
+        }
+      } catch {
+        // 忽略损坏或不可读取的历史数据。
+      }
+    }
+
     async function requestStock(region, query = "", preset = "") {
       showError("");
       if (region === "hk") setLoading(true, Boolean(preset));
@@ -233,9 +255,9 @@
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || `查询失败（HTTP ${response.status}）`);
         renderStores(data);
+        if (region === "hk") rememberLastQuery(data);
         if (region === "mo") state.macauLoaded = true;
       } catch (error) {
-        elements.results.classList.add("hidden");
         showError(error instanceof Error ? error.message : "查询失败，请稍后重试。");
       } finally {
         if (region === "hk") setLoading(false);
@@ -249,11 +271,13 @@
       elements.tabMo.setAttribute("aria-selected", String(!isHk));
       elements.panelHk.classList.toggle("hidden", !isHk);
       elements.panelMo.classList.toggle("hidden", isHk);
-      elements.results.classList.add("hidden");
+      if (isHk && state.lastQuery) renderStores(state.lastQuery);
+      else elements.results.classList.add("hidden");
       showError("");
       if (!isHk && !state.macauLoaded) requestStock("mo");
     }
 
+    restoreLastQuery();
     elements.form.addEventListener("submit", event => {
       event.preventDefault();
       requestStock("hk", elements.query.value);

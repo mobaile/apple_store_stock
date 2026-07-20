@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import unittest
 from http.client import HTTPConnection
+from importlib.resources import files
 from threading import Thread
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
@@ -284,6 +285,14 @@ class HTTPBoundaryTests(unittest.TestCase):
         self.assertEqual(response.status, 415)
         self.assertEqual(payload["error"], "unsupported_media_type")
         client.query_stock.assert_not_called()
+
+
+class HomePageTests(unittest.TestCase):
+    def test_home_page_persists_and_restores_last_successful_query(self) -> None:
+        page = files("apple_store_stock").joinpath("web/index.html").read_text()
+
+        self.assertIn("localStorage.setItem(LAST_QUERY_KEY", page)
+        self.assertIn("restoreLastQuery();", page)
 
 
 class MacauTests(unittest.TestCase):
