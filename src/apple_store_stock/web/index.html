@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apple Store 库存查询</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f5f7;
+      --card: rgba(255, 255, 255, 0.94);
+      --text: #1d1d1f;
+      --muted: #6e6e73;
+      --line: #d2d2d7;
+      --blue: #0071e3;
+      --green: #16863a;
+      --green-bg: #e9f7ee;
+      --red: #b42318;
+      --red-bg: #fff0ee;
+      --shadow: 0 10px 35px rgba(0, 0, 0, 0.07);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(circle at 50% -15%, #fff 0, var(--bg) 46%);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;
+    }
+    main { width: min(940px, calc(100% - 32px)); margin: 0 auto; padding: 64px 0 80px; }
+    header { text-align: center; margin-bottom: 30px; }
+    h1 { margin: 0 0 10px; font-size: clamp(32px, 6vw, 54px); letter-spacing: -0.045em; }
+    header p { margin: 0; color: var(--muted); font-size: 17px; }
+    .panel {
+      background: var(--card);
+      border: 1px solid rgba(0, 0, 0, 0.06);
+      border-radius: 24px;
+      box-shadow: var(--shadow);
+      padding: clamp(20px, 4vw, 34px);
+      backdrop-filter: blur(18px);
+    }
+    .tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: #e8e8ed; padding: 5px; border-radius: 13px; margin-bottom: 28px; }
+    .tab { border: 0; border-radius: 9px; padding: 11px; background: transparent; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+    .tab[aria-selected="true"] { background: white; color: var(--text); box-shadow: 0 1px 5px rgba(0,0,0,.12); }
+    label { display: block; font-weight: 600; margin-bottom: 9px; }
+    .search-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+    input {
+      width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 12px; padding: 13px 14px; font: inherit; background: white;
+    }
+    input:focus { outline: 3px solid rgba(0, 113, 227, .2); border-color: var(--blue); }
+    .primary { border: 0; border-radius: 12px; background: var(--blue); color: white; padding: 0 22px; font: inherit; font-weight: 600; cursor: pointer; }
+    .primary:disabled { opacity: .55; cursor: wait; }
+    .help { margin: 10px 0 20px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; }
+    .preset { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 8px 12px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
+    .preset:hover { border-color: var(--blue); color: var(--blue); }
+    .notice, .error { margin-top: 22px; border-radius: 14px; padding: 14px 16px; line-height: 1.55; }
+    .notice { background: #f0f6ff; color: #174d80; }
+    .error { background: var(--red-bg); color: var(--red); }
+    .hidden { display: none !important; }
+    .summary { margin: 28px 0 14px; display: flex; align-items: end; justify-content: space-between; gap: 16px; }
+    .summary h2 { margin: 0 0 5px; font-size: 23px; letter-spacing: -.02em; }
+    .summary p { margin: 0; color: var(--muted); font-size: 13px; }
+    .count { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .store-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .store { border: 1px solid var(--line); border-radius: 17px; padding: 17px; background: white; }
+    .store.available { border-color: #8bd5a5; background: var(--green-bg); }
+    .store-head { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+    .store h3 { margin: 0; font-size: 17px; }
+    .store-number { color: var(--muted); font-size: 12px; margin-top: 3px; }
+    .badge { flex: 0 0 auto; border-radius: 999px; padding: 5px 9px; background: #ededf0; color: var(--muted); font-size: 12px; font-weight: 700; }
+    .available .badge { background: #d4f1de; color: var(--green); }
+    .quote { margin: 15px 0 8px; font-weight: 600; }
+    .meta { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.55; white-space: pre-line; }
+    a { color: var(--blue); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .source { display: inline-block; margin-top: 14px; font-size: 13px; }
+    @media (max-width: 680px) {
+      main { padding-top: 38px; }
+      .search-row, .store-grid { grid-template-columns: 1fr; }
+      .primary { min-height: 46px; }
+      .summary { align-items: start; flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Apple Store 库存查询</h1>
+      <p>精确到 SKU、颜色、内存和储存空间。</p>
+    </header>
+    <section class="panel">
+      <div class="tabs" role="tablist" aria-label="选择地区">
+        <button id="tab-hk" class="tab" role="tab" aria-selected="true">香港实时库存</button>
+        <button id="tab-mo" class="tab" role="tab" aria-selected="false">澳门门店</button>
+      </div>
+
+      <section id="panel-hk" role="tabpanel" aria-labelledby="tab-hk">
+        <form id="search-form">
+          <label for="query">Apple 香港商品网址或 SKU</label>
+          <div class="search-row">
+            <input id="query" name="query" autocomplete="off" spellcheck="false" placeholder="例如 MJ3D4ZP/A" required>
+            <button id="submit" class="primary" type="submit">查询库存</button>
+          </div>
+          <p class="help">商品网址必须是完成尺寸、芯片、内存、硬盘和颜色选择后的精确购买页。首次查询需启动无头 Chrome，通常会稍慢。</p>
+          <div class="presets" aria-label="常用配置">
+            <button class="preset" type="button" data-sku="MJ3D4ZP/A">32GB + 1TB · 太空黑色</button>
+            <button class="preset" type="button" data-sku="MJ3E4ZP/A">32GB + 1TB · 银色</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="panel-mo" class="hidden" role="tabpanel" aria-labelledby="tab-mo">
+        <div class="notice">Apple 澳门没有在线购买及门店提取库存接口。这里仅展示官方直营店和电话，不会把未知库存误报为“无货”。</div>
+      </section>
+
+      <div id="error" class="error hidden" role="alert"></div>
+      <section id="results" class="hidden" aria-live="polite">
+        <div class="summary">
+          <div>
+            <h2 id="result-title"></h2>
+            <p id="result-meta"></p>
+          </div>
+          <div id="result-count" class="count"></div>
+        </div>
+        <div id="store-grid" class="store-grid"></div>
+        <a id="source-link" class="source hidden" target="_blank" rel="noreferrer">打开官方页面 ↗</a>
+      </section>
+    </section>
+  </main>
+  <script>
+    const state = { region: "hk", macauLoaded: false };
+    const elements = {
+      tabHk: document.querySelector("#tab-hk"),
+      tabMo: document.querySelector("#tab-mo"),
+      panelHk: document.querySelector("#panel-hk"),
+      panelMo: document.querySelector("#panel-mo"),
+      form: document.querySelector("#search-form"),
+      query: document.querySelector("#query"),
+      submit: document.querySelector("#submit"),
+      error: document.querySelector("#error"),
+      results: document.querySelector("#results"),
+      title: document.querySelector("#result-title"),
+      meta: document.querySelector("#result-meta"),
+      count: document.querySelector("#result-count"),
+      grid: document.querySelector("#store-grid"),
+      source: document.querySelector("#source-link")
+    };
+
+    function showError(message) {
+      elements.error.textContent = message;
+      elements.error.classList.toggle("hidden", !message);
+    }
+
+    function setLoading(loading) {
+      elements.submit.disabled = loading;
+      elements.submit.textContent = loading ? "正在查询…" : "查询库存";
+    }
+
+    function addText(parent, className, text) {
+      if (!text) return;
+      const node = document.createElement("p");
+      node.className = className;
+      node.textContent = text;
+      parent.appendChild(node);
+    }
+
+    function renderStores(data) {
+      elements.grid.replaceChildren();
+      elements.title.textContent = data.region === "hk" ? (data.product_name || data.sku) : "澳门 Apple Store";
+      elements.meta.textContent = data.region === "hk"
+        ? `SKU ${data.sku} · 查询时间 ${new Date(data.checked_at).toLocaleString()}`
+        : data.message;
+      elements.count.textContent = data.realtime_supported
+        ? `${data.available_count} 家有货 / ${data.stores.length} 家门店`
+        : `${data.stores.length} 家官方直营店`;
+
+      for (const store of data.stores) {
+        const card = document.createElement("article");
+        card.className = `store${store.available ? " available" : ""}`;
+        const head = document.createElement("div");
+        head.className = "store-head";
+        const heading = document.createElement("div");
+        const title = document.createElement("h3");
+        title.textContent = store.store_name;
+        heading.appendChild(title);
+        addText(heading, "store-number", store.store_number);
+        const badge = document.createElement("span");
+        badge.className = "badge";
+        badge.textContent = data.realtime_supported
+          ? (store.available ? "有货" : store.status === "unavailable" ? "暂无库存" : "状态未知")
+          : "电话确认";
+        head.append(heading, badge);
+        card.appendChild(head);
+        addText(card, "quote", store.quote);
+        addText(card, "meta", store.address);
+        addText(card, "meta", store.distance);
+        if (store.phone) {
+          const phone = document.createElement("a");
+          phone.className = "source";
+          phone.href = `tel:${store.phone}`;
+          phone.textContent = `电话 ${store.phone}`;
+          card.appendChild(phone);
+        }
+        elements.grid.appendChild(card);
+      }
+
+      const sourceUrl = data.purchase_url || data.source_url;
+      elements.source.classList.toggle("hidden", !sourceUrl);
+      if (sourceUrl) elements.source.href = sourceUrl;
+      elements.results.classList.remove("hidden");
+    }
+
+    async function requestStock(region, query = "") {
+      showError("");
+      if (region === "hk") setLoading(true);
+      try {
+        const response = await fetch("/api/stock", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ region, query })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || `查询失败（HTTP ${response.status}）`);
+        renderStores(data);
+        if (region === "mo") state.macauLoaded = true;
+      } catch (error) {
+        elements.results.classList.add("hidden");
+        showError(error instanceof Error ? error.message : "查询失败，请稍后重试。");
+      } finally {
+        if (region === "hk") setLoading(false);
+      }
+    }
+
+    function switchRegion(region) {
+      state.region = region;
+      const isHk = region === "hk";
+      elements.tabHk.setAttribute("aria-selected", String(isHk));
+      elements.tabMo.setAttribute("aria-selected", String(!isHk));
+      elements.panelHk.classList.toggle("hidden", !isHk);
+      elements.panelMo.classList.toggle("hidden", isHk);
+      elements.results.classList.add("hidden");
+      showError("");
+      if (!isHk && !state.macauLoaded) requestStock("mo");
+    }
+
+    elements.form.addEventListener("submit", event => {
+      event.preventDefault();
+      requestStock("hk", elements.query.value);
+    });
+    document.querySelectorAll(".preset").forEach(button => {
+      button.addEventListener("click", () => {
+        elements.query.value = button.dataset.sku;
+        requestStock("hk", button.dataset.sku);
+      });
+    });
+    elements.tabHk.addEventListener("click", () => switchRegion("hk"));
+    elements.tabMo.addEventListener("click", () => switchRegion("mo"));
+  </script>
+</body>
+</html>
+
