@@ -1,6 +1,11 @@
 # Apple Store 库存查询
 
+[![测试](https://github.com/mobaile/apple_store_stock/actions/workflows/test.yml/badge.svg)](https://github.com/mobaile/apple_store_stock/actions/workflows/test.yml)
+
 本地查询香港 Apple Store 的精确 SKU 库存。支持直接输入 Apple part number，或粘贴完成全部配置后的 Apple 香港商品网址。
+
+> [!NOTE]
+> 这是非官方的个人本机工具，与 Apple Inc. 无隶属、授权或认可关系。请遵守 Apple 网站的使用条款，避免高频或商业化请求。
 
 ## 功能
 
@@ -21,8 +26,9 @@
 ## 安装与启动
 
 ```bash
-cd /Volumes/resourse/CurCode/apple_store_stock
-uv sync
+git clone https://github.com/mobaile/apple_store_stock.git
+cd apple_store_stock
+uv sync --locked
 uv run apple-store-stock
 ```
 
@@ -39,6 +45,13 @@ uv run apple-store-stock --no-open
 ```
 
 按 `Control+C` 停止服务并关闭无头 Chrome。
+
+## 安全与隐私
+
+- 服务固定监听 `127.0.0.1`，只供本机访问；不要改为 `0.0.0.0`、配置公网反向代理或部署为共享服务。
+- 浏览器上下文和 SHIELD Cookie 只保存在内存，程序退出后销毁。
+- 商品网址只接受 `https://www.apple.com` 的香港购买页面，API 只接受 JSON 请求。
+- 安全问题请按 [安全政策](SECURITY.md) 私下报告，不要在公开 Issue 中披露漏洞或敏感数据。
 
 ## 如何查询
 
@@ -86,3 +99,7 @@ uv run python -m unittest discover -s tests -v
 - 当前仅为单用户本地工具，串行处理查询。
 - 不包含定时监控、通知、数据库、登录或远程部署。
 - 澳门官网没有在线购买及门店提取接口，因此无法可靠查询实时库存；请致电门店确认。
+
+## 许可证
+
+本项目采用 [0BSD](LICENSE) 许可证：允许任何用途的使用、复制、修改和分发，不要求署名；软件按原样提供，不附带担保。

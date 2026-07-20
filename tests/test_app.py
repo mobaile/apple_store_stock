@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import json
 import unittest
+from http.client import HTTPConnection
+from threading import Thread
 from unittest.mock import Mock, patch
 from urllib.parse import parse_qs, urlparse
 
-from apple_store_stock.app import build_stock_response
+from apple_store_stock.app import StockHTTPServer, build_stock_response
 from apple_store_stock.core import (
     AppleResponseError,
     AppleStockClient,
@@ -252,6 +254,36 @@ class RetryAndLifecycleTests(unittest.TestCase):
         context.close.assert_called_once_with()
         browser.close.assert_called_once_with()
         playwright.stop.assert_called_once_with()
+
+
+class HTTPBoundaryTests(unittest.TestCase):
+    def test_post_rejects_non_json_content_type(self) -> None:
+        client = Mock()
+        with StockHTTPServer(("127.0.0.1", 0), client) as server:
+            server.timeout = 2
+            thread = Thread(target=server.handle_request, daemon=True)
+            thread.start()
+            connection = HTTPConnection(*server.server_address, timeout=2)
+            try:
+                connection.request(
+                    "POST",
+                    "/api/stock",
+                    body='{"region":"hk","query":"MJ3D4ZP/A"}',
+                    headers={
+                        "Content-Type": "text/plain",
+                        "Origin": "https://example.invalid",
+                    },
+                )
+                response = connection.getresponse()
+                payload = json.loads(response.read())
+            finally:
+                connection.close()
+                thread.join(timeout=2)
+
+        self.assertFalse(thread.is_alive())
+        self.assertEqual(response.status, 415)
+        self.assertEqual(payload["error"], "unsupported_media_type")
+        client.query_stock.assert_not_called()
 
 
 class MacauTests(unittest.TestCase):

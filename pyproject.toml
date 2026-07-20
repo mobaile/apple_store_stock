@@ -3,11 +3,16 @@ name = "apple-store-stock"
 version = "0.1.0"
 description = "查询香港 Apple Store 精确 SKU 的实时库存"
 readme = "README.md"
+license = "0BSD"
 requires-python = ">=3.13,<3.14"
 dependencies = [
     "playwright>=1.61,<2",
     "playwright-stealth>=2.0.3,<3",
 ]
+
+[project.urls]
+Repository = "https://github.com/mobaile/apple_store_stock"
+Issues = "https://github.com/mobaile/apple_store_stock/issues"
 
 [project.scripts]
 apple-store-stock = "apple_store_stock.app:main"
@@ -18,4 +23,3 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/apple_store_stock"]
-

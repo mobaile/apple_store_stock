@@ -113,6 +113,15 @@ class StockRequestHandler(BaseHTTPRequestHandler):
         if urlparse(self.path).path != "/api/stock":
             self._send_json(404, {"error": "not_found", "message": "接口不存在。"})
             return
+        if self.headers.get_content_type() != "application/json":
+            self._send_json(
+                415,
+                {
+                    "error": "unsupported_media_type",
+                    "message": "Content-Type 必须是 application/json。",
+                },
+            )
+            return
 
         try:
             raw_length = self.headers.get("Content-Length")
