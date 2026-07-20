@@ -9,7 +9,14 @@ from importlib.resources import files
 from typing import Any
 from urllib.parse import urlparse
 
-from .core import AppleStockClient, InputError, StockError, macau_response
+from .core import (
+    HK_PRIME_URL,
+    PRESETS,
+    AppleStockClient,
+    InputError,
+    StockError,
+    macau_response,
+)
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -24,6 +31,33 @@ def build_stock_response(payload: Any, client: AppleStockClient) -> dict[str, An
         return macau_response()
     if region != "hk":
         raise InputError("region 只支持 hk 或 mo。")
+
+    preset = payload.get("preset")
+    if preset is not None:
+        if preset != "macbook-pro-1tb":
+            raise InputError("不支持这个一键查询配置。")
+        results = client.query_skus(tuple(item["sku"] for item in PRESETS))
+        stores = [
+            {
+                **store,
+                "configuration": item["label"],
+                "sku": result["sku"],
+            }
+            for item, result in zip(PRESETS, results, strict=True)
+            for store in result["stores"]
+        ]
+        return {
+            "region": "hk",
+            "realtime_supported": True,
+            "product_name": "14 英寸 M5 MacBook Pro · 24GB / 32GB · 1TB",
+            "checked_at": results[-1]["checked_at"],
+            "variant_count": len(results),
+            "store_count": len(results[0]["stores"]),
+            "available_count": sum(result["available_count"] for result in results),
+            "stores": stores,
+            "source_url": HK_PRIME_URL,
+        }
+
     query = payload.get("query")
     if not isinstance(query, str):
         raise InputError("香港查询必须提供 query 字符串。")

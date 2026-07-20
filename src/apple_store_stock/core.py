@@ -28,12 +28,20 @@ MAX_QUERY_LENGTH = 8_192
 
 PRESETS = (
     {
+        "sku": "MDE34ZP/A",
+        "label": "24GB · 1TB · 太空黑色",
+    },
+    {
+        "sku": "MDE64ZP/A",
+        "label": "24GB · 1TB · 银色",
+    },
+    {
         "sku": "MJ3D4ZP/A",
-        "label": "14 英寸 M5 · 32GB · 1TB · 太空黑色",
+        "label": "32GB · 1TB · 太空黑色",
     },
     {
         "sku": "MJ3E4ZP/A",
-        "label": "14 英寸 M5 · 32GB · 1TB · 银色",
+        "label": "32GB · 1TB · 银色",
     },
 )
 
@@ -461,14 +469,14 @@ class AppleStockClient:
         page = self._navigate(url, product_url=True)
         return extract_product_sku(page.content())
 
-    def _fetch_payload(self, sku: str) -> dict[str, Any]:
+    def _fetch_payload(self, skus: tuple[str, ...]) -> dict[str, Any]:
         page = self._ensure_runtime()
         query_url = f"{HK_FULFILLMENT_URL}?{
             urlencode(
                 {
                     'fae': 'true',
                     'pl': 'true',
-                    'parts.0': sku,
+                    **{f'parts.{index}': sku for index, sku in enumerate(skus)},
                     'location': 'Hong Kong',
                     'searchNearby': 'true',
                 }
@@ -521,8 +529,21 @@ class AppleStockClient:
             raise RetryableAppleError("Apple 库存接口返回了无效对象。")
         return payload
 
+    def query_skus(self, skus: tuple[str, ...]) -> list[dict[str, Any]]:
+        normalized = tuple(normalize_sku(sku) for sku in skus)
+
+        def operation() -> list[dict[str, Any]]:
+            self._ensure_shield()
+            payload = self._fetch_payload(normalized)
+            return [parse_stock_payload(payload, sku) for sku in normalized]
+
+        return run_with_single_retry(operation, self._restart)
+
     def query_stock(self, query: str) -> dict[str, Any]:
         product_query = parse_product_query(query)
+        if product_query.sku is not None:
+            return self.query_skus((product_query.sku,))[0]
+
         resolved_sku = product_query.sku
 
         def operation() -> dict[str, Any]:
@@ -532,7 +553,7 @@ class AppleStockClient:
                 resolved_sku = self._sku_from_url(product_query.url)
             else:
                 self._ensure_shield()
-            payload = self._fetch_payload(resolved_sku)
+            payload = self._fetch_payload((resolved_sku,))
             return parse_stock_payload(payload, resolved_sku, product_query.url)
 
         return run_with_single_retry(operation, self._restart)

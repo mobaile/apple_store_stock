@@ -54,6 +54,8 @@
     .presets { display: flex; flex-wrap: wrap; gap: 8px; }
     .preset { border: 1px solid var(--line); background: white; border-radius: 999px; padding: 8px 12px; color: var(--text); font: inherit; font-size: 13px; cursor: pointer; }
     .preset:hover { border-color: var(--blue); color: var(--blue); }
+    .preset-all { border-color: var(--blue); color: var(--blue); font-weight: 700; }
+    .preset:disabled { opacity: .55; cursor: wait; }
     .notice, .error { margin-top: 22px; border-radius: 14px; padding: 14px 16px; line-height: 1.55; }
     .notice { background: #f0f6ff; color: #174d80; }
     .error { background: var(--red-bg); color: var(--red); }
@@ -103,9 +105,8 @@
             <button id="submit" class="primary" type="submit">查询库存</button>
           </div>
           <p class="help">商品网址必须是完成尺寸、芯片、内存、硬盘和颜色选择后的精确购买页。首次查询需启动无头 Chrome，通常会稍慢。</p>
-          <div class="presets" aria-label="常用配置">
-            <button class="preset" type="button" data-sku="MJ3D4ZP/A">32GB + 1TB · 太空黑色</button>
-            <button class="preset" type="button" data-sku="MJ3E4ZP/A">32GB + 1TB · 银色</button>
+          <div class="presets" aria-label="一键查询常用配置">
+            <button id="query-macbook-pro-1tb" class="preset preset-all" type="button">一键查询 24GB / 32GB + 1TB</button>
           </div>
         </form>
       </section>
@@ -138,6 +139,7 @@
       form: document.querySelector("#search-form"),
       query: document.querySelector("#query"),
       submit: document.querySelector("#submit"),
+      quickQuery: document.querySelector("#query-macbook-pro-1tb"),
       error: document.querySelector("#error"),
       results: document.querySelector("#results"),
       title: document.querySelector("#result-title"),
@@ -152,9 +154,13 @@
       elements.error.classList.toggle("hidden", !message);
     }
 
-    function setLoading(loading) {
+    function setLoading(loading, grouped = false) {
       elements.submit.disabled = loading;
       elements.submit.textContent = loading ? "正在查询…" : "查询库存";
+      elements.quickQuery.disabled = loading;
+      elements.quickQuery.textContent = loading
+        ? (grouped ? "正在完整查询 4 个配置…" : "正在查询…")
+        : "一键查询 24GB / 32GB + 1TB";
     }
 
     function addText(parent, className, text) {
@@ -169,10 +175,14 @@
       elements.grid.replaceChildren();
       elements.title.textContent = data.region === "hk" ? (data.product_name || data.sku) : "澳门 Apple Store";
       elements.meta.textContent = data.region === "hk"
-        ? `SKU ${data.sku} · 查询时间 ${new Date(data.checked_at).toLocaleString()}`
+        ? (data.variant_count
+          ? `${data.variant_count} 个配置 × ${data.store_count} 家门店 · 查询时间 ${new Date(data.checked_at).toLocaleString()}`
+          : `SKU ${data.sku} · 查询时间 ${new Date(data.checked_at).toLocaleString()}`)
         : data.message;
       elements.count.textContent = data.realtime_supported
-        ? `${data.available_count} 家有货 / ${data.stores.length} 家门店`
+        ? (data.variant_count
+          ? `${data.available_count} 个有货结果 / ${data.stores.length} 个配置门店组合`
+          : `${data.available_count} 家有货 / ${data.stores.length} 家门店`)
         : `${data.stores.length} 家官方直营店`;
 
       for (const store of data.stores) {
@@ -182,9 +192,9 @@
         head.className = "store-head";
         const heading = document.createElement("div");
         const title = document.createElement("h3");
-        title.textContent = store.store_name;
+        title.textContent = store.configuration ? `${store.configuration} · ${store.store_name}` : store.store_name;
         heading.appendChild(title);
-        addText(heading, "store-number", store.store_number);
+        addText(heading, "store-number", store.sku ? `SKU ${store.sku} · ${store.store_number}` : store.store_number);
         const badge = document.createElement("span");
         badge.className = "badge";
         badge.textContent = data.realtime_supported
@@ -211,14 +221,14 @@
       elements.results.classList.remove("hidden");
     }
 
-    async function requestStock(region, query = "") {
+    async function requestStock(region, query = "", preset = "") {
       showError("");
-      if (region === "hk") setLoading(true);
+      if (region === "hk") setLoading(true, Boolean(preset));
       try {
         const response = await fetch("/api/stock", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ region, query })
+          body: JSON.stringify(preset ? { region, preset } : { region, query })
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.message || `查询失败（HTTP ${response.status}）`);
@@ -248,15 +258,9 @@
       event.preventDefault();
       requestStock("hk", elements.query.value);
     });
-    document.querySelectorAll(".preset").forEach(button => {
-      button.addEventListener("click", () => {
-        elements.query.value = button.dataset.sku;
-        requestStock("hk", button.dataset.sku);
-      });
-    });
+    elements.quickQuery.addEventListener("click", () => requestStock("hk", "", "macbook-pro-1tb"));
     elements.tabHk.addEventListener("click", () => switchRegion("hk"));
     elements.tabMo.addEventListener("click", () => switchRegion("mo"));
   </script>
 </body>
 </html>
-

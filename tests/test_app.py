@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
+from urllib.parse import parse_qs, urlparse
 
 from apple_store_stock.app import build_stock_response
 from apple_store_stock.core import (
@@ -148,6 +150,33 @@ class PayloadTests(unittest.TestCase):
 
 
 class RetryAndLifecycleTests(unittest.TestCase):
+    def test_query_skus_fetches_all_parts_once(self) -> None:
+        skus = ("MDE34ZP/A", "MJ3D4ZP/A")
+        payload = stock_payload("available")
+        availability = payload["body"]["content"]["pickupMessage"]["stores"][0][
+            "partsAvailability"
+        ]
+        availability[skus[0]] = dict(availability[skus[1]])
+        page = Mock()
+        page.evaluate.return_value = {
+            "status": 200,
+            "contentType": "application/json",
+            "text": json.dumps(payload),
+        }
+        client = AppleStockClient()
+
+        with (
+            patch.object(client, "_ensure_shield"),
+            patch.object(client, "_ensure_runtime", return_value=page),
+        ):
+            results = client.query_skus(skus)
+
+        query = parse_qs(urlparse(page.evaluate.call_args.args[1]).query)
+        self.assertEqual(query["parts.0"], [skus[0]])
+        self.assertEqual(query["parts.1"], [skus[1]])
+        self.assertEqual([result["sku"] for result in results], list(skus))
+        page.evaluate.assert_called_once()
+
     def test_retry_once_then_succeed(self) -> None:
         attempts = 0
         resets = 0
@@ -245,6 +274,39 @@ class MacauTests(unittest.TestCase):
         result = build_stock_response({"region": "hk", "query": "MJ3D4ZP/A"}, client)
         self.assertEqual(result, {"region": "hk"})
         client.query_stock.assert_called_once_with("MJ3D4ZP/A")
+
+    def test_hong_kong_preset_queries_all_four_skus_once(self) -> None:
+        skus = ("MDE34ZP/A", "MDE64ZP/A", "MJ3D4ZP/A", "MJ3E4ZP/A")
+        client = Mock()
+        client.query_skus.return_value = [
+            {
+                "sku": sku,
+                "checked_at": "2026-07-20T12:00:00+08:00",
+                "available_count": index % 2,
+                "stores": [{"store_name": f"Store {index}"}],
+            }
+            for index, sku in enumerate(skus)
+        ]
+
+        result = build_stock_response(
+            {"region": "hk", "preset": "macbook-pro-1tb"}, client
+        )
+
+        client.query_skus.assert_called_once_with(skus)
+        client.query_stock.assert_not_called()
+        self.assertEqual(result["variant_count"], 4)
+        self.assertEqual(result["store_count"], 1)
+        self.assertEqual(result["available_count"], 2)
+        self.assertEqual(len(result["stores"]), 4)
+        self.assertEqual(
+            [store["configuration"] for store in result["stores"]],
+            [
+                "24GB · 1TB · 太空黑色",
+                "24GB · 1TB · 银色",
+                "32GB · 1TB · 太空黑色",
+                "32GB · 1TB · 银色",
+            ],
+        )
 
 
 if __name__ == "__main__":
