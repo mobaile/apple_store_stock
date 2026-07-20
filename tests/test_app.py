@@ -125,6 +125,7 @@ class PayloadTests(unittest.TestCase):
         self.assertFalse(result["stores"][2]["available"])
         self.assertEqual(result["stores"][2]["status"], "future")
         self.assertEqual(result["product_name"], "14-inch MacBook Pro")
+        self.assertEqual(result["stores"][0]["phone"], "+85212340001")
         self.assertIn("purchase_url", result)
 
     def test_empty_stores_is_not_reported_as_out_of_stock(self) -> None:
@@ -260,6 +261,10 @@ class MacauTests(unittest.TestCase):
         self.assertEqual(
             [store["store_number"] for store in result["stores"]],
             ["R697", "R672"],
+        )
+        self.assertEqual(
+            [store["phone"] for store in result["stores"]],
+            ["+85387917000", "+85387919000"],
         )
 
     def test_macau_api_does_not_call_apple_client(self) -> None:

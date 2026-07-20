@@ -50,14 +50,14 @@ MACAU_STORES = (
         "store_number": "R697",
         "store_name": "路氹金光大道",
         "address": "路氹城伦敦人购物中心",
-        "phone": "87917000",
+        "phone": "+85387917000",
         "url": "https://www.apple.com/mo/retail/cotaistrip/",
     },
     {
         "store_number": "R672",
         "store_name": "澳门银河",
         "address": "路氹城澳门银河™时尚汇",
-        "phone": "87919000",
+        "phone": "+85387919000",
         "url": "https://www.apple.com/mo/retail/galaxymacau/",
     },
 )
@@ -214,6 +214,13 @@ def _string(value: Any) -> str:
     return value.strip() if isinstance(value, str) else ""
 
 
+def _international_phone(value: Any, country_code: str) -> str:
+    digits = re.sub(r"\D", "", _string(value)).removeprefix("00")
+    if not digits:
+        return ""
+    return f"+{digits if digits.startswith(country_code) else country_code + digits}"
+
+
 def _address_text(address: dict[str, Any]) -> str:
     two_lines = address.get("twoLineAddress")
     if isinstance(two_lines, str) and two_lines.strip():
@@ -303,7 +310,7 @@ def parse_stock_payload(
                 "available": status == "available",
                 "quote": quote,
                 "address": _address_text(address),
-                "phone": _string(address.get("daytimePhone")),
+                "phone": _international_phone(address.get("daytimePhone"), "852"),
                 "distance": _string(retail.get("distanceWithUnit"))
                 or _string(store.get("distanceWithUnit")),
             }
